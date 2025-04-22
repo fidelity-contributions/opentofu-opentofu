@@ -352,3 +352,59 @@ Providers are then managed and scoped by the EvalContextBuiltin where the actual
 Providers also may supply functions, either unconfigured or configured.
 * `providers::aws::arn_parse(var.arn)`
 * `providers::aws::us::arn_parse(var.arn)`
+
+## Using `provider for_each` with Modules and Resources
+
+The `for_each` meta-argument can be used with providers to create multiple instances of a provider configuration. This is particularly useful when you need to interact with multiple accounts, regions, or environments.
+
+### Example: Using `provider for_each` with Resources
+
+```hcl
+provider "aws" {
+  for_each = {
+    us_east_1 = "us-east-1"
+    us_west_1 = "us-west-1"
+  }
+
+  region = each.value
+}
+
+resource "aws_s3_bucket" "example" {
+  provider = aws[each.key]
+  for_each = aws
+
+  bucket = "example-bucket-${each.key}"
+}
+```
+### Example: Using `provider for_each` with Resources
+```hcl
+provider "aws" {
+  for_each = {
+    dev  = "us-east-1"
+    prod = "us-west-1"
+  }
+
+  region = each.value
+}
+
+module "example" {
+  source   = "./modules/example"
+  providers = {
+    aws = aws[each.key]
+  }
+  for_each = aws
+
+  environment = each.key
+}
+```
+### Limitations of `provider for_each`
+
+While `provider for_each` is a powerful feature, it has some limitations that users should be aware of:
+
+1. **Provider Aliases**: The `for_each` meta-argument cannot be used directly with provider aliases. Instead, you must define multiple provider configurations using `for_each` at the provider level.
+2. **Explicit Provider References**: Resources and modules must explicitly reference the correct provider instance using the `provider` argument or `providers` map. This can make configurations more verbose and harder to manage.
+3. **State Management**: Each provider instance creates its own state. This can complicate state management, especially when dealing with multiple provider instances. Ensure you understand how state files are structured when using `for_each`.
+4. **Dependency Graph Complexity**: Using `for_each` with providers can make the dependency graph more complex, particularly when combined with modules or resources. This may lead to unexpected behaviors if dependencies are not explicitly defined.
+5. **Static Keys Only**: The keys used in the `for_each` map must be known at plan time. Dynamically generated keys are not supported, which can limit flexibility in some scenarios.
+
+By understanding these limitations and carefully designing your configurations, you can effectively use `provider for_each` to manage multiple provider instances.
